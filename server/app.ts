@@ -3,6 +3,7 @@ import cors from 'cors'
 import healthRouter from './routes/health.js'
 import uploadRouter from './routes/upload.js'
 import generateRouter from './routes/generate.js'
+import exportRouter from './routes/export.js'
 
 export function createApp() {
   const app = express()
@@ -13,6 +14,7 @@ export function createApp() {
   app.use('/api/health', healthRouter)
   app.use('/api/upload', uploadRouter)
   app.use('/api/generate', generateRouter)
+  app.use('/api/export', exportRouter)
 
   return app
 }
