@@ -1,6 +1,6 @@
-import * as pdfjsLib from 'pdfjs-dist'
+// Use legacy build for Node.js compatibility
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
-// Disable worker in Node environment
 pdfjsLib.GlobalWorkerOptions.workerSrc = ''
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
@@ -8,7 +8,6 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
   const doc = await pdfjsLib.getDocument({
     data,
     useWorkerFetch: false,
-    isEvalSupported: false,
   }).promise
 
   const pageTexts: string[] = []

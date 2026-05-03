@@ -1,11 +1,18 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY environment variable is required')
-}
-
-export const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 export const MODEL = 'claude-sonnet-4-5'
+
+// Lazy singleton — defer until first call so dotenv has time to load
+let _client: Anthropic | null = null
+function getClient(): Anthropic {
+  if (!_client) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY environment variable is required')
+    }
+    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  }
+  return _client
+}
 
 export interface PromptConfig {
   systemPrompt: string
@@ -15,7 +22,7 @@ export interface PromptConfig {
 }
 
 export async function runPrompt(config: PromptConfig, signal?: AbortSignal): Promise<string> {
-  const response = await anthropic.messages.create(
+  const response = await getClient().messages.create(
     {
       model: MODEL,
       max_tokens: config.maxTokens,

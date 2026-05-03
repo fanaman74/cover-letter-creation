@@ -5,6 +5,10 @@ import { draftLetterPrompt } from './prompts/draft-letter.js'
 import { auditLetterPrompt } from './prompts/audit-letter.js'
 import type { CvProfile, VacancyAnalysis, PipelineResult, LetterData } from './types.js'
 
+function stripFences(raw: string): string {
+  return raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+}
+
 export type PhaseEvent =
   | { phase: 'cv_analysis'; status: 'start' | 'complete'; data?: CvProfile }
   | { phase: 'vacancy_review'; status: 'start' | 'complete'; data?: VacancyAnalysis }
@@ -23,13 +27,13 @@ export async function runPipeline(
     // Phase 1: CV Analysis
     emit({ phase: 'cv_analysis', status: 'start' })
     const cvRaw = await runPrompt(cvAnalysisPrompt(cvText), signal)
-    const cvProfile: CvProfile = JSON.parse(cvRaw)
+    const cvProfile: CvProfile = JSON.parse(stripFences(cvRaw))
     emit({ phase: 'cv_analysis', status: 'complete', data: cvProfile })
 
     // Phase 2: Vacancy Review
     emit({ phase: 'vacancy_review', status: 'start' })
     const vacancyRaw = await runPrompt(vacancyReviewPrompt(cvProfile, vacancyText), signal)
-    const vacancy: VacancyAnalysis = JSON.parse(vacancyRaw)
+    const vacancy: VacancyAnalysis = JSON.parse(stripFences(vacancyRaw))
     emit({ phase: 'vacancy_review', status: 'complete', data: vacancy })
 
     // Phase 3: Draft Letter

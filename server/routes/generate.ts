@@ -24,7 +24,7 @@ router.post('/', async (req: Request, res: Response) => {
   res.flushHeaders()
 
   const ac = new AbortController()
-  req.on('close', () => ac.abort())
+  res.on('close', () => ac.abort())
 
   const send = (event: object) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`)
