@@ -1,13 +1,31 @@
 import { useState } from 'react'
 import { useAppStore } from '../stores/appStore'
-import { exportDocx } from '../lib/api'
+import { exportDocx, refineLetter } from '../lib/api'
 import { IconEnvelope, Star } from './Illos'
 
 export default function ResultView() {
-  const { result, error, reset } = useAppStore()
+  const { result, error, reset, updateLetterText } = useAppStore()
   const [downloading, setDownloading] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [refinePrompt, setRefinePrompt] = useState('')
+  const [refining, setRefining] = useState(false)
+  const [refineError, setRefineError] = useState<string | null>(null)
+
+  async function handleRefine() {
+    if (!result || !refinePrompt.trim()) return
+    setRefineError(null)
+    setRefining(true)
+    try {
+      const refined = await refineLetter(result.letterText, refinePrompt.trim())
+      updateLetterText(refined)
+      setRefinePrompt('')
+    } catch (e) {
+      setRefineError((e as Error).message)
+    } finally {
+      setRefining(false)
+    }
+  }
 
   async function handleDownload() {
     if (!result) return
@@ -199,6 +217,41 @@ export default function ResultView() {
 > ready to ship.`}</pre>
           </div>
         </div>
+      </div>
+
+      {/* Refine section */}
+      <div className="card" style={{ marginTop: 28, padding: 24 }}>
+        <div className="row gap-3 ai-center" style={{ marginBottom: 14 }}>
+          <span style={{ fontSize: 22 }}>✦</span>
+          <span className="display" style={{ fontSize: 22 }}>Refine the letter</span>
+          <span className="hand" style={{ fontSize: 16, color: 'var(--ink-3)', marginLeft: 4 }}>tell the agent what to change</span>
+        </div>
+        <div className="row gap-3" style={{ alignItems: 'flex-end' }}>
+          <textarea
+            className="ink-field"
+            value={refinePrompt}
+            onChange={e => setRefinePrompt(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRefine() }}
+            placeholder="e.g. make the opening stronger · add more about project management · shorten by 50 words · use a warmer tone"
+            rows={3}
+            style={{ flex: 1 }}
+            disabled={refining}
+          />
+          <button
+            className="btn"
+            onClick={handleRefine}
+            disabled={refining || !refinePrompt.trim()}
+            style={{ minWidth: 120, alignSelf: 'stretch' }}
+          >
+            {refining ? '⟳ refining…' : '↺ refine'}
+          </button>
+        </div>
+        {refineError && (
+          <p className="hand" style={{ fontSize: 16, color: 'var(--rust)', marginTop: 10 }}>{refineError}</p>
+        )}
+        <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
+          Tip: ⌘↵ to submit · the letter and doc preview update instantly
+        </p>
       </div>
     </div>
   )

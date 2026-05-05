@@ -37,6 +37,7 @@ interface AppState {
   updatePhase: (id: Phase['id'], status: Phase['status']) => void
   setResult: (result: GenerateResult) => void
   setError: (error: string) => void
+  updateLetterText: (letterText: string) => void
   reset: () => void
   goHistory: () => void
   goBack: () => void
@@ -83,6 +84,17 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   setError: (error) => set({ error, step: 'result' }),
+
+  updateLetterText: (letterText) =>
+    set(state => {
+      if (!state.result) return {}
+      const updated = {
+        ...state.result,
+        letterText,
+        metadata: { ...state.result.metadata, bodyParagraphs: letterText.split(/\n\n+/).map(p => p.trim()).filter(Boolean) },
+      }
+      return { result: updated }
+    }),
 
   reset: () =>
     set({

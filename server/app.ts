@@ -7,6 +7,7 @@ import healthRouter from './routes/health.js'
 import uploadRouter from './routes/upload.js'
 import generateRouter from './routes/generate.js'
 import exportRouter from './routes/export.js'
+import refineRouter from './routes/refine.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -20,6 +21,7 @@ export function createApp() {
   app.use('/api/upload', uploadRouter)
   app.use('/api/generate', generateRouter)
   app.use('/api/export', exportRouter)
+  app.use('/api/refine', refineRouter)
 
   // Serve built frontend in production
   const distPath = join(__dirname, '../dist')
