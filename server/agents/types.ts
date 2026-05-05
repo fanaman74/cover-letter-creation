@@ -27,7 +27,7 @@ export interface VacancyAnalysis {
   contractType: string
   grade: string
   employerLocation: string
-  register: 'eu' | 'un' | 'private' | 'ngo'
+  register: 'startup' | 'corporate' | 'government' | 'creative' | 'nonprofit'
   selectionCriteria: {
     essential: string[]
     advantageous: string[]

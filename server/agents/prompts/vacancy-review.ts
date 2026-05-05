@@ -19,7 +19,7 @@ export function vacancyReviewPrompt(cvProfile: CvProfile, vacancyText: string): 
   "contractType": string,
   "grade": string,
   "employerLocation": string,
-  "register": "eu" | "un" | "private" | "ngo",
+  "register": "startup" | "corporate" | "government" | "creative" | "nonprofit",
   "selectionCriteria": {
     "essential": [string],
     "advantageous": [string],
@@ -31,15 +31,16 @@ export function vacancyReviewPrompt(cvProfile: CvProfile, vacancyText: string): 
 }
 
 Register classification:
-- "eu": EU institution or agency
-- "un": UN or international organisation
-- "private": private sector company
-- "ngo": NGO or civil society
+- "startup": startup, scale-up, or tech company with informal culture
+- "corporate": large enterprise, bank, consultancy, or professional services firm
+- "government": government department, public sector body, EU/UN institution, agency
+- "creative": creative agency, media, design, or arts organisation
+- "nonprofit": NGO, charity, civil society, or mission-driven organisation
 
 Salutation rules:
-- EU/UN employer → "Dear Selection Board"
-- Private sector → "Dear Hiring Manager"
-- If hiring manager name found in vacancy → "Dear [Name]"
+- Government/EU/UN employer → "Dear Selection Board" or "Dear Hiring Manager"
+- If a named hiring manager or contact is found in the vacancy → "Dear [Name]"
+- All others → "Dear Hiring Manager"
 
 keyLanguage: 3-5 specific phrases from the vacancy that should be echoed (not copied) in the letter.
 gaps: only criteria where the CV provides weak or no direct evidence. Provide the strongest available transferable evidence from the CV profile.
