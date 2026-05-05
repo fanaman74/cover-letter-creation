@@ -20,13 +20,40 @@ const TONE_OPTS = [
 
 export default function VacancyStep() {
   const { cvText, vacancyText, setVacancyText, startGeneration, updatePhase, setResult, setError, reset } = useAppStore()
+  const [mode, setMode] = useState<'paste' | 'url'>('paste')
   const [localText, setLocalText] = useState(vacancyText)
+  const [url, setUrl] = useState('')
+  const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [fetched, setFetched] = useState(false)
   const [tone, setTone] = useState('EU')
   const [validationError, setValidationError] = useState<string | null>(null)
 
+  async function handleFetchUrl() {
+    if (!url.trim()) return
+    setFetchError(null)
+    setFetching(true)
+    setFetched(false)
+    try {
+      const res = await fetch('/api/fetch-vacancy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url.trim() }),
+      })
+      const data = await res.json() as { text?: string; error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Failed to fetch page')
+      setLocalText(data.text ?? '')
+      setFetched(true)
+    } catch (e) {
+      setFetchError((e as Error).message)
+    } finally {
+      setFetching(false)
+    }
+  }
+
   async function handleGenerate() {
     if (localText.trim().length < 50) {
-      setValidationError('Paste the full vacancy announcement (at least 50 characters)')
+      setValidationError('Paste or fetch a vacancy (at least 50 characters)')
       return
     }
     setValidationError(null)
@@ -72,19 +99,61 @@ export default function VacancyStep() {
         {/* Left — vacancy input */}
         <div className="col gap-5">
           <div className="card" style={{ padding: 24 }}>
-            <div className="row gap-4 ai-center" style={{ marginBottom: 14 }}>
-              <IconVacancy size={64}/>
-              <div className="col gap-1">
-                <span className="small-caps" style={{ color: 'var(--ink-3)' }}>Paste the full announcement</span>
-                <span className="display" style={{ fontSize: 28 }}>Vacancy notice</span>
+            <div className="row between ai-center" style={{ marginBottom: 14 }}>
+              <div className="row gap-4 ai-center">
+                <IconVacancy size={56}/>
+                <div className="col gap-1">
+                  <span className="small-caps" style={{ color: 'var(--ink-3)' }}>The vacancy</span>
+                  <span className="display" style={{ fontSize: 28 }}>Job posting</span>
+                </div>
+              </div>
+              <div className="row gap-2">
+                {(['paste', 'url'] as const).map(m => (
+                  <button key={m} className="btn btn-ghost"
+                    onClick={() => { setMode(m); setFetchError(null); setValidationError(null) }}
+                    style={{ padding: '8px 16px', background: mode === m ? 'var(--ink)' : '#fff', color: mode === m ? 'var(--paper)' : 'var(--ink)' }}>
+                    {m === 'paste' ? 'Paste text' : '↗ From URL'}
+                  </button>
+                ))}
               </div>
             </div>
+
+            {mode === 'url' && (
+              <div className="col gap-3" style={{ marginBottom: 14 }}>
+                <div className="row gap-2" style={{ alignItems: 'stretch' }}>
+                  <input
+                    className="ink-field"
+                    type="url"
+                    value={url}
+                    onChange={e => { setUrl(e.target.value); setFetched(false) }}
+                    onKeyDown={e => e.key === 'Enter' && handleFetchUrl()}
+                    placeholder="https://careers.example.com/job/123"
+                    style={{ flex: 1 }}
+                    disabled={fetching}
+                  />
+                  <button className="btn" onClick={handleFetchUrl} disabled={fetching || !url.trim()} style={{ minWidth: 100 }}>
+                    {fetching ? '⟳ fetching…' : '↗ fetch'}
+                  </button>
+                </div>
+                {fetchError && (
+                  <p className="hand" style={{ fontSize: 16, color: 'var(--rust)', margin: 0 }}>{fetchError}</p>
+                )}
+                {fetched && (
+                  <p className="hand" style={{ fontSize: 16, color: 'var(--moss)', margin: 0 }}>
+                    ✓ page loaded — {localText.split(/\s+/).length} words extracted
+                  </p>
+                )}
+              </div>
+            )}
+
             <textarea
               className="ink-field"
               value={localText}
-              onChange={e => setLocalText(e.target.value)}
-              placeholder="Include the full job description, tasks, selection criteria, employer details, and reference number…"
-              rows={16}
+              onChange={e => { setLocalText(e.target.value); setFetched(false) }}
+              placeholder={mode === 'url'
+                ? 'Extracted text will appear here — you can edit it before generating…'
+                : 'Include the full job description, tasks, selection criteria, employer details, and reference number…'}
+              rows={mode === 'url' ? 12 : 16}
             />
             {validationError && (
               <p className="hand" style={{ fontSize: 18, color: 'var(--rust)', marginTop: 8 }}>{validationError}</p>
@@ -114,12 +183,8 @@ export default function VacancyStep() {
             <div className="row gap-2" style={{ flexWrap: 'wrap', marginBottom: 12 }}>
               {TONE_OPTS.map(o => (
                 <button key={o.id} className="btn btn-ghost"
-                        onClick={() => setTone(o.id)}
-                        style={{
-                          background: tone === o.id ? o.c : '#fff',
-                          color: tone === o.id ? '#fff' : 'var(--ink)',
-                          padding: '10px 16px',
-                        }}>
+                  onClick={() => setTone(o.id)}
+                  style={{ background: tone === o.id ? o.c : '#fff', color: tone === o.id ? '#fff' : 'var(--ink)', padding: '10px 16px' }}>
                   {o.label}
                 </button>
               ))}
@@ -135,8 +200,8 @@ export default function VacancyStep() {
               {[
                 { n: '01', label: 'CV analysis', note: 'reads career arc + hooks' },
                 { n: '02', label: 'Vacancy review', note: 'criteria mapping + gaps' },
-                { n: '03', label: 'Draft letter', note: '350–450 words, no clichés' },
-                { n: '04', label: 'AI audit', note: '10 quality gates' },
+                { n: '03', label: 'Draft letter', note: '300–420 words, no clichés' },
+                { n: '04', label: 'AI audit', note: '12 quality gates' },
               ].map(item => (
                 <div key={item.n} className="row gap-3 ai-center">
                   <span className="stat-num" style={{ fontSize: 28, lineHeight: 1, color: 'var(--ink-3)', minWidth: 32 }}>{item.n}</span>
