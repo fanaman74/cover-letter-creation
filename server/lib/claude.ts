@@ -1,16 +1,16 @@
 import OpenAI from 'openai'
 
-export const MODEL = 'google/gemma-4-26b-a4b-it:free'
+export const MODEL = 'gemini-2.0-pro-exp'
 
 let _client: OpenAI | null = null
 function getClient(): OpenAI {
   if (!_client) {
-    if (!process.env.OPENROUTER_API_KEY) {
-      throw new Error('OPENROUTER_API_KEY environment variable is required')
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error('GOOGLE_API_KEY environment variable is required')
     }
     _client = new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      apiKey: process.env.GOOGLE_API_KEY,
     })
   }
   return _client
