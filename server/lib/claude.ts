@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 
-export const MODEL = 'gemini-2.0-pro-exp'
+export const MODEL = 'gemini-2.5-flash'
 
 let _client: OpenAI | null = null
 function getClient(): OpenAI {
