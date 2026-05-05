@@ -1,5 +1,19 @@
 import { create } from 'zustand'
-import type { AppStep, Phase, GenerateResult } from '../types'
+import type { AppStep, Phase, GenerateResult, HistoryEntry } from '../types'
+
+const HISTORY_KEY = 'clg-history'
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(entries: HistoryEntry[]) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries))
+}
 
 const INITIAL_PHASES: Phase[] = [
   { id: 'cv_analysis', label: 'Analysing CV', status: 'pending' },
@@ -24,6 +38,8 @@ interface AppState {
   setResult: (result: GenerateResult) => void
   setError: (error: string) => void
   reset: () => void
+  goHistory: () => void
+  goBack: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -51,7 +67,21 @@ export const useAppStore = create<AppState>((set) => ({
       phases: state.phases.map(p => (p.id === id ? { ...p, status } : p)),
     })),
 
-  setResult: (result) => set({ result, step: 'result' }),
+  setResult: (result) => {
+    const entry: HistoryEntry = {
+      id: Date.now().toString(),
+      company: result.metadata.employerName,
+      jobTitle: result.metadata.roleTitle,
+      location: result.metadata.employerLocation,
+      date: result.metadata.date,
+      reference: result.metadata.reference,
+      letterText: result.letterText,
+    }
+    const prev = loadHistory()
+    saveHistory([entry, ...prev])
+    set({ result, step: 'result' })
+  },
+
   setError: (error) => set({ error, step: 'result' }),
 
   reset: () =>
@@ -64,4 +94,7 @@ export const useAppStore = create<AppState>((set) => ({
       result: null,
       error: null,
     }),
+
+  goHistory: () => set({ step: 'history' }),
+  goBack: () => set({ step: 'upload' }),
 }))

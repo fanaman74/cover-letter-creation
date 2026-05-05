@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { streamPostSse } from '../lib/sse'
+import { IconVacancy, Star } from './Illos'
 import type { LetterMetadata } from '../types'
 
 interface SseEvent {
@@ -11,20 +11,17 @@ interface SseEvent {
   message?: string
 }
 
-export default function VacancyStep() {
-  const {
-    cvText,
-    vacancyText,
-    setVacancyText,
-    startGeneration,
-    updatePhase,
-    setResult,
-    setError,
-    reset,
-  } = useAppStore()
+const TONE_OPTS = [
+  { id: 'EU', label: 'EU / Agency', c: 'var(--teal)', desc: 'Formal-professional. Measured confidence. Mirror mission/mandate language.' },
+  { id: 'UN', label: 'UN / Intl', c: 'var(--moss)', desc: 'Mission-driven. Global scope and cross-cultural experience foregrounded.' },
+  { id: 'PRIV', label: 'Private', c: 'var(--terracotta)', desc: 'Warmer, more direct. Outcomes and impact lead. Quantify where possible.' },
+  { id: 'NGO', label: 'NGO', c: 'var(--plum)', desc: 'Values-aligned. Concrete contribution framed in mission terms.' },
+]
 
+export default function VacancyStep() {
+  const { cvText, vacancyText, setVacancyText, startGeneration, updatePhase, setResult, setError, reset } = useAppStore()
   const [localText, setLocalText] = useState(vacancyText)
-  const [submitting, setSubmitting] = useState(false)
+  const [tone, setTone] = useState('EU')
   const [validationError, setValidationError] = useState<string | null>(null)
 
   async function handleGenerate() {
@@ -35,17 +32,11 @@ export default function VacancyStep() {
     setValidationError(null)
     setVacancyText(localText.trim())
     startGeneration()
-    setSubmitting(true)
 
     try {
-      const stream = streamPostSse('/api/generate', {
-        cvText,
-        vacancyText: localText.trim(),
-      })
-
+      const stream = streamPostSse('/api/generate', { cvText, vacancyText: localText.trim() })
       for await (const raw of stream) {
         const e = raw as SseEvent
-
         if (e.phase === 'cv_analysis') {
           updatePhase('cv_analysis', e.status === 'start' ? 'running' : 'complete')
         } else if (e.phase === 'vacancy_review') {
@@ -62,50 +53,110 @@ export default function VacancyStep() {
       }
     } catch (err) {
       setError((err as Error).message)
-    } finally {
-      setSubmitting(false)
     }
   }
 
   return (
-    <div className="max-w-xl mx-auto">
-      <button
-        onClick={reset}
-        className="flex items-center gap-1.5 text-sm mb-6 transition-colors"
-        style={{ color: 'var(--muted)' }}
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back
-      </button>
+    <div style={{ maxWidth: 1380, margin: '0 auto', padding: '28px 28px' }}>
+      <div className="col gap-4" style={{ marginBottom: 24 }}>
+        <div className="row gap-3 ai-center">
+          <span className="ribbon ribbon-teal">Phase 02 · Vacancy review</span>
+          <span className="hand" style={{ fontSize: 22, color: 'var(--rust)' }}>where are we sending it?</span>
+        </div>
+        <h1 className="display" style={{ fontSize: 56, margin: 0 }}>
+          The <span className="display-italic" style={{ color: 'var(--teal)' }}>destination</span> shapes the letter.
+        </h1>
+      </div>
 
-      <h2 className="text-xl font-semibold mb-1">Paste the vacancy</h2>
-      <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
-        Include the full job description, selection criteria, and employer details.
-      </p>
+      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 28 }}>
+        {/* Left — vacancy input */}
+        <div className="col gap-5">
+          <div className="card" style={{ padding: 24 }}>
+            <div className="row gap-4 ai-center" style={{ marginBottom: 14 }}>
+              <IconVacancy size={64}/>
+              <div className="col gap-1">
+                <span className="small-caps" style={{ color: 'var(--ink-3)' }}>Paste the full announcement</span>
+                <span className="display" style={{ fontSize: 28 }}>Vacancy notice</span>
+              </div>
+            </div>
+            <textarea
+              className="ink-field"
+              value={localText}
+              onChange={e => setLocalText(e.target.value)}
+              placeholder="Include the full job description, tasks, selection criteria, employer details, and reference number…"
+              rows={16}
+            />
+            {validationError && (
+              <p className="hand" style={{ fontSize: 18, color: 'var(--rust)', marginTop: 8 }}>{validationError}</p>
+            )}
+          </div>
 
-      <textarea
-        value={localText}
-        onChange={e => setLocalText(e.target.value)}
-        placeholder="Paste the full vacancy announcement here…"
-        rows={16}
-        className="w-full rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2"
-        style={{ border: '1px solid var(--border)' }}
-      />
+          <div className="card" style={{ padding: 22, background: 'var(--paper-2)' }}>
+            <div className="row gap-3 ai-center" style={{ marginBottom: 10 }}>
+              <Star fill="#f5d572"/>
+              <span className="display" style={{ fontSize: 22 }}>What the agent extracts</span>
+            </div>
+            <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
+              {['Employer & unit', 'Role title & ref', 'Essential criteria', 'Advantageous criteria', 'Mirror language', 'Gap analysis', 'Salutation'].map(t => (
+                <span key={t} className="pill pill-soft" style={{ fontSize: 12 }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        </div>
 
-      {validationError && (
-        <p className="mt-2 text-sm" style={{ color: 'var(--error)' }}>
-          {validationError}
-        </p>
-      )}
+        {/* Right — tone + controls */}
+        <div className="col gap-5">
+          <div className="card" style={{ padding: 22 }}>
+            <div className="row between ai-center" style={{ marginBottom: 12 }}>
+              <span className="display" style={{ fontSize: 24 }}>Tone calibration</span>
+              <span className="hand" style={{ fontSize: 18, color: 'var(--rust)' }}>auto-detected</span>
+            </div>
+            <div className="row gap-2" style={{ flexWrap: 'wrap', marginBottom: 12 }}>
+              {TONE_OPTS.map(o => (
+                <button key={o.id} className="btn btn-ghost"
+                        onClick={() => setTone(o.id)}
+                        style={{
+                          background: tone === o.id ? o.c : '#fff',
+                          color: tone === o.id ? '#fff' : 'var(--ink)',
+                          padding: '10px 16px',
+                        }}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="hand" style={{ fontSize: 19, color: 'var(--ink-2)', margin: 0 }}>
+              {TONE_OPTS.find(o => o.id === tone)?.desc}
+            </p>
+          </div>
 
-      <button
-        onClick={handleGenerate}
-        disabled={submitting}
-        className="mt-4 w-full py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
-        style={{ background: 'var(--accent)', color: '#fff' }}
-      >
-        Generate cover letter
-      </button>
+          <div className="card" style={{ padding: 22 }}>
+            <div className="small-caps" style={{ color: 'var(--ink-3)', marginBottom: 12 }}>Pipeline</div>
+            <div className="col gap-3">
+              {[
+                { n: '01', label: 'CV analysis', note: 'reads career arc + hooks' },
+                { n: '02', label: 'Vacancy review', note: 'criteria mapping + gaps' },
+                { n: '03', label: 'Draft letter', note: '350–450 words, no clichés' },
+                { n: '04', label: 'AI audit', note: '10 quality gates' },
+              ].map(item => (
+                <div key={item.n} className="row gap-3 ai-center">
+                  <span className="stat-num" style={{ fontSize: 28, lineHeight: 1, color: 'var(--ink-3)', minWidth: 32 }}>{item.n}</span>
+                  <div className="col">
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{item.label}</span>
+                    <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{item.note}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="row between ai-center">
+            <button className="btn btn-ghost" onClick={reset}>← back to CV</button>
+            <button className="btn" onClick={handleGenerate}>
+              generate cover letter →
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

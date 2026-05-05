@@ -30,7 +30,16 @@ router.post('/', async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`)
   }
 
-  await runPipeline(cvText, vacancyText, send, ac.signal)
+  // Heartbeat every 8s keeps the SSE connection alive through proxies/browsers
+  const heartbeat = setInterval(() => {
+    if (!res.writableEnded) res.write(': ping\n\n')
+  }, 8000)
+
+  try {
+    await runPipeline(cvText, vacancyText, send, ac.signal)
+  } finally {
+    clearInterval(heartbeat)
+  }
   res.end()
 })
 

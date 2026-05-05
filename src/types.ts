@@ -1,4 +1,4 @@
-export type AppStep = 'upload' | 'vacancy' | 'generating' | 'result'
+export type AppStep = 'upload' | 'vacancy' | 'generating' | 'result' | 'history'
 
 export type PhaseStatus = 'pending' | 'running' | 'complete' | 'error'
 
@@ -25,4 +25,14 @@ export interface LetterMetadata {
 export interface GenerateResult {
   letterText: string
   metadata: LetterMetadata
+}
+
+export interface HistoryEntry {
+  id: string
+  company: string
+  jobTitle: string
+  location: string
+  date: string
+  reference: string
+  letterText: string
 }
