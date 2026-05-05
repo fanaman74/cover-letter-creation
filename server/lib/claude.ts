@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 
-export const MODEL = 'google/gemma-4-27b-it:free'
+export const MODEL = 'google/gemma-4-26b-a4b-it:free'
 
 let _client: OpenAI | null = null
 function getClient(): OpenAI {
