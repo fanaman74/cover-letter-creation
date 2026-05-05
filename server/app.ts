@@ -9,6 +9,7 @@ import generateRouter from './routes/generate.js'
 import exportRouter from './routes/export.js'
 import refineRouter from './routes/refine.js'
 import fetchVacancyRouter from './routes/fetch-vacancy.js'
+import summariseVacancyRouter from './routes/summarise-vacancy.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -24,6 +25,7 @@ export function createApp() {
   app.use('/api/export', exportRouter)
   app.use('/api/refine', refineRouter)
   app.use('/api/fetch-vacancy', fetchVacancyRouter)
+  app.use('/api/summarise-vacancy', summariseVacancyRouter)
 
   // Serve built frontend in production
   const distPath = join(__dirname, '../dist')

@@ -11,6 +11,18 @@ interface SseEvent {
   message?: string
 }
 
+interface VacancySummary {
+  employer: string
+  role: string
+  location: string
+  contractType: string
+  reference: string
+  deadline: string
+  essentialCriteria: string[]
+  advantageousCriteria: string[]
+  keyResponsibilities: string[]
+}
+
 const TONE_OPTS = [
   { id: 'EU', label: 'EU / Agency', c: 'var(--teal)', desc: 'Formal-professional. Measured confidence. Mirror mission/mandate language.' },
   { id: 'UN', label: 'UN / Intl', c: 'var(--moss)', desc: 'Mission-driven. Global scope and cross-cultural experience foregrounded.' },
@@ -29,11 +41,17 @@ export default function VacancyStep() {
   const [tone, setTone] = useState('EU')
   const [validationError, setValidationError] = useState<string | null>(null)
 
+  // Summarise state
+  const [summarising, setSummarising] = useState(false)
+  const [summary, setSummary] = useState<VacancySummary | null>(null)
+  const [summariseError, setSummariseError] = useState<string | null>(null)
+
   async function handleFetchUrl() {
     if (!url.trim()) return
     setFetchError(null)
     setFetching(true)
     setFetched(false)
+    setSummary(null)
     try {
       const res = await fetch('/api/fetch-vacancy', {
         method: 'POST',
@@ -51,12 +69,32 @@ export default function VacancyStep() {
     }
   }
 
-  async function handleGenerate() {
+  async function handleSummarise() {
     if (localText.trim().length < 50) {
       setValidationError('Paste or fetch a vacancy (at least 50 characters)')
       return
     }
     setValidationError(null)
+    setSummariseError(null)
+    setSummarising(true)
+    setSummary(null)
+    try {
+      const res = await fetch('/api/summarise-vacancy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancyText: localText.trim() }),
+      })
+      const data = await res.json() as VacancySummary & { error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Summarise failed')
+      setSummary(data)
+    } catch (e) {
+      setSummariseError((e as Error).message)
+    } finally {
+      setSummarising(false)
+    }
+  }
+
+  async function handleGenerate() {
     setVacancyText(localText.trim())
     startGeneration()
 
@@ -110,7 +148,7 @@ export default function VacancyStep() {
               <div className="row gap-2">
                 {(['paste', 'url'] as const).map(m => (
                   <button key={m} className="btn btn-ghost"
-                    onClick={() => { setMode(m); setFetchError(null); setValidationError(null) }}
+                    onClick={() => { setMode(m); setFetchError(null); setValidationError(null); setSummary(null) }}
                     style={{ padding: '8px 16px', background: mode === m ? 'var(--ink)' : '#fff', color: mode === m ? 'var(--paper)' : 'var(--ink)' }}>
                     {m === 'paste' ? 'Paste text' : '↗ From URL'}
                   </button>
@@ -125,7 +163,7 @@ export default function VacancyStep() {
                     className="ink-field"
                     type="url"
                     value={url}
-                    onChange={e => { setUrl(e.target.value); setFetched(false) }}
+                    onChange={e => { setUrl(e.target.value); setFetched(false); setSummary(null) }}
                     onKeyDown={e => e.key === 'Enter' && handleFetchUrl()}
                     placeholder="https://careers.example.com/job/123"
                     style={{ flex: 1 }}
@@ -149,7 +187,7 @@ export default function VacancyStep() {
             <textarea
               className="ink-field"
               value={localText}
-              onChange={e => { setLocalText(e.target.value); setFetched(false) }}
+              onChange={e => { setLocalText(e.target.value); setFetched(false); setSummary(null) }}
               placeholder={mode === 'url'
                 ? 'Extracted text will appear here — you can edit it before generating…'
                 : 'Include the full job description, tasks, selection criteria, employer details, and reference number…'}
@@ -173,7 +211,7 @@ export default function VacancyStep() {
           </div>
         </div>
 
-        {/* Right — tone + controls */}
+        {/* Right — tone + controls + summary */}
         <div className="col gap-5">
           <div className="card" style={{ padding: 22 }}>
             <div className="row between ai-center" style={{ marginBottom: 12 }}>
@@ -193,6 +231,45 @@ export default function VacancyStep() {
               {TONE_OPTS.find(o => o.id === tone)?.desc}
             </p>
           </div>
+
+          {/* Summary card — shown after summarise */}
+          {summary && (
+            <div className="card" style={{ padding: 22, background: 'var(--paper-2)', borderLeft: '3px solid var(--teal)' }}>
+              <div className="row between ai-center" style={{ marginBottom: 12 }}>
+                <span className="display" style={{ fontSize: 20 }}>Vacancy summary</span>
+                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>review before generating</span>
+              </div>
+              <div className="col gap-2" style={{ fontSize: 14 }}>
+                <div><strong>{summary.role}</strong> · {summary.employer}</div>
+                {summary.location && <div style={{ color: 'var(--ink-2)' }}>📍 {summary.location}</div>}
+                <div className="row gap-3" style={{ color: 'var(--ink-2)', flexWrap: 'wrap' }}>
+                  {summary.contractType && summary.contractType !== 'Unknown' && <span>📋 {summary.contractType}</span>}
+                  {summary.reference && <span>🔖 Ref: {summary.reference}</span>}
+                  {summary.deadline && <span>⏰ {summary.deadline}</span>}
+                </div>
+                {summary.essentialCriteria.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>ESSENTIAL</div>
+                    <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-2)' }}>
+                      {summary.essentialCriteria.map((c, i) => <li key={i}>{c}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {summary.advantageousCriteria.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>ADVANTAGEOUS</div>
+                    <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-3)' }}>
+                      {summary.advantageousCriteria.map((c, i) => <li key={i}>{c}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {summariseError && (
+            <p className="hand" style={{ fontSize: 16, color: 'var(--rust)', margin: 0 }}>{summariseError}</p>
+          )}
 
           <div className="card" style={{ padding: 22 }}>
             <div className="small-caps" style={{ color: 'var(--ink-3)', marginBottom: 12 }}>Pipeline</div>
@@ -216,9 +293,35 @@ export default function VacancyStep() {
 
           <div className="row between ai-center">
             <button className="btn btn-ghost" onClick={reset}>← back to CV</button>
-            <button className="btn" onClick={handleGenerate}>
-              generate cover letter →
-            </button>
+            <div className="row gap-2">
+              {!summary ? (
+                <button
+                  className="btn btn-ghost"
+                  onClick={handleSummarise}
+                  disabled={summarising}
+                  style={{ borderColor: 'var(--teal)', color: 'var(--teal)' }}
+                >
+                  {summarising ? '⟳ summarising…' : '↗ summarise vacancy'}
+                </button>
+              ) : (
+                <button
+                  className="btn btn-ghost"
+                  onClick={handleSummarise}
+                  disabled={summarising}
+                  style={{ fontSize: 13, padding: '8px 14px' }}
+                >
+                  {summarising ? '⟳' : '↺ re-summarise'}
+                </button>
+              )}
+              <button
+                className="btn"
+                onClick={handleGenerate}
+                disabled={!summary}
+                style={{ opacity: summary ? 1 : 0.45 }}
+              >
+                generate cover letter →
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -5,8 +5,30 @@ import { draftLetterPrompt } from './prompts/draft-letter.js'
 import { auditLetterPrompt } from './prompts/audit-letter.js'
 import type { CvProfile, VacancyAnalysis, PipelineResult, LetterData } from './types.js'
 
-function stripFences(raw: string): string {
-  return raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+function extractJson(raw: string): string {
+  // Find first { or [ to last } or ]
+  const objStart = raw.indexOf('{')
+  const arrStart = raw.indexOf('[')
+  const start = objStart === -1 ? arrStart : arrStart === -1 ? objStart : Math.min(objStart, arrStart)
+  if (start === -1) return raw
+
+  const isObj = raw[start] === '{'
+  const close = isObj ? '}' : ']'
+  const end = raw.lastIndexOf(close)
+  if (end === -1 || end <= start) return raw
+
+  return raw.slice(start, end + 1)
+}
+
+function parseJson<T>(raw: string): T {
+  const cleaned = extractJson(raw)
+  try {
+    return JSON.parse(cleaned) as T
+  } catch {
+    // Try fixing unescaped newlines/tabs inside strings
+    const fixed = cleaned.replace(/(?<=:\s*"(?:[^"\\]|\\.)*)[\n\r\t](?=(?:[^"\\]|\\.)*")/g, ' ')
+    return JSON.parse(fixed) as T
+  }
 }
 
 export type PhaseEvent =
@@ -27,14 +49,14 @@ export async function runPipeline(
     // Phase 1: CV Analysis
     emit({ phase: 'cv_analysis', status: 'start' })
     const cvRaw = await runPrompt(cvAnalysisPrompt(cvText), signal)
-    const cvProfile: CvProfile = JSON.parse(stripFences(cvRaw))
-    emit({ phase: 'cv_analysis', status: 'complete', data: cvProfile })
+    const cvProfile: CvProfile = parseJson<CvProfile>(cvRaw)
+    emit({ phase: 'cv_analysis', status: 'complete' })
 
     // Phase 2: Vacancy Review
     emit({ phase: 'vacancy_review', status: 'start' })
     const vacancyRaw = await runPrompt(vacancyReviewPrompt(cvProfile, vacancyText), signal)
-    const vacancy: VacancyAnalysis = JSON.parse(stripFences(vacancyRaw))
-    emit({ phase: 'vacancy_review', status: 'complete', data: vacancy })
+    const vacancy: VacancyAnalysis = parseJson<VacancyAnalysis>(vacancyRaw)
+    emit({ phase: 'vacancy_review', status: 'complete' })
 
     // Phase 3: Draft Letter
     emit({ phase: 'draft_letter', status: 'start' })
