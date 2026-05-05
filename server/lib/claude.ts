@@ -1,15 +1,17 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-export const MODEL = 'claude-sonnet-4-5'
+export const MODEL = 'anthropic/claude-sonnet-4-5'
 
-// Lazy singleton — defer until first call so dotenv has time to load
-let _client: Anthropic | null = null
-function getClient(): Anthropic {
+let _client: OpenAI | null = null
+function getClient(): OpenAI {
   if (!_client) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is required')
+    if (!process.env.OPENROUTER_API_KEY) {
+      throw new Error('OPENROUTER_API_KEY environment variable is required')
     }
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    _client = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: process.env.OPENROUTER_API_KEY,
+    })
   }
   return _client
 }
@@ -22,17 +24,19 @@ export interface PromptConfig {
 }
 
 export async function runPrompt(config: PromptConfig, signal?: AbortSignal): Promise<string> {
-  const response = await getClient().messages.create(
+  const response = await getClient().chat.completions.create(
     {
       model: MODEL,
       max_tokens: config.maxTokens,
       temperature: config.temperature,
-      system: config.systemPrompt,
-      messages: [{ role: 'user', content: config.userPrompt }],
+      messages: [
+        { role: 'system', content: config.systemPrompt },
+        { role: 'user', content: config.userPrompt },
+      ],
     },
     { signal }
   )
-  const block = response.content[0]
-  if (block.type !== 'text') throw new Error('Unexpected response type from Claude')
-  return block.text
+  const text = response.choices[0]?.message?.content
+  if (!text) throw new Error('Empty response from model')
+  return text
 }
