@@ -162,7 +162,7 @@ export default function VacancyStep() {
               <div className="row gap-2">
                 {(['paste', 'url'] as const).map(m => (
                   <button key={m} className="btn btn-ghost"
-                    onClick={() => { setMode(m); setFetchError(null); setValidationError(null); setSummary(null) }}
+                    onClick={() => { setMode(m); setUrl(''); setFetchError(null); setValidationError(null); setSummary(null) }}
                     style={{ padding: '8px 16px', background: mode === m ? 'var(--ink)' : '#fff', color: mode === m ? 'var(--paper)' : 'var(--ink)' }}>
                     {m === 'paste' ? 'Paste text' : '↗ From URL'}
                   </button>
