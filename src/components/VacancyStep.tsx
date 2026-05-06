@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useAppStore } from '../stores/appStore'
 import { streamPostSse } from '../lib/sse'
 import { IconVacancy, Star } from './Illos'
@@ -34,14 +34,12 @@ export default function VacancyStep() {
   const { cvText, vacancyText, setVacancyText, startGeneration, updatePhase, setResult, setError, reset } = useAppStore()
   const [mode, setMode] = useState<'paste' | 'url'>('paste')
   const [localText, setLocalText] = useState(vacancyText)
+  const [url, setUrl] = useState('')
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [fetched, setFetched] = useState(false)
   const [tone, setTone] = useState('EU')
   const [validationError, setValidationError] = useState<string | null>(null)
-
-  // Use a ref for URL so paste always works regardless of React's synthetic events
-  const urlRef = useRef<HTMLInputElement>(null)
 
   // Summarise state
   const [summarising, setSummarising] = useState(false)
@@ -69,8 +67,7 @@ export default function VacancyStep() {
   }
 
   async function handleFetchUrl() {
-    const urlVal = urlRef.current?.value.trim() ?? ''
-    if (!urlVal) {
+    if (!url.trim()) {
       setFetchError('Enter a URL first')
       return
     }
@@ -82,7 +79,7 @@ export default function VacancyStep() {
       const res = await fetch('/api/fetch-vacancy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlVal }),
+        body: JSON.stringify({ url: url.trim() }),
       })
       const data = await res.json() as { text?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to fetch page')
@@ -177,12 +174,11 @@ export default function VacancyStep() {
               <div className="col gap-3" style={{ marginBottom: 14 }}>
                 <div className="row gap-2" style={{ alignItems: 'stretch' }}>
                   <input
-                    ref={urlRef}
                     className="ink-field"
                     type="text"
-                    defaultValue=""
+                    value={url}
                     onKeyDown={e => e.key === 'Enter' && handleFetchUrl()}
-                    onChange={() => { setFetched(false); setSummary(null) }}
+                    onChange={e => { setUrl(e.target.value); setFetched(false); setSummary(null) }}
                     placeholder="https://careers.example.com/job/123"
                     style={{ flex: 1 }}
                     disabled={fetching}
