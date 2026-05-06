@@ -48,6 +48,26 @@ export default function VacancyStep() {
   const [summary, setSummary] = useState<VacancySummary | null>(null)
   const [summariseError, setSummariseError] = useState<string | null>(null)
 
+  async function runSummarise(text: string) {
+    setSummariseError(null)
+    setSummarising(true)
+    setSummary(null)
+    try {
+      const res = await fetch('/api/summarise-vacancy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancyText: text }),
+      })
+      const data = await res.json() as VacancySummary & { error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Summarise failed')
+      setSummary(data)
+    } catch (e) {
+      setSummariseError((e as Error).message)
+    } finally {
+      setSummarising(false)
+    }
+  }
+
   async function handleFetchUrl() {
     const urlVal = urlRef.current?.value.trim() ?? ''
     if (!urlVal) return
@@ -63,8 +83,11 @@ export default function VacancyStep() {
       })
       const data = await res.json() as { text?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to fetch page')
-      setLocalText(data.text ?? '')
+      const fetched = data.text ?? ''
+      setLocalText(fetched)
       setFetched(true)
+      // Auto-summarise after fetch
+      if (fetched.trim().length >= 50) await runSummarise(fetched)
     } catch (e) {
       setFetchError((e as Error).message)
     } finally {
@@ -78,23 +101,7 @@ export default function VacancyStep() {
       return
     }
     setValidationError(null)
-    setSummariseError(null)
-    setSummarising(true)
-    setSummary(null)
-    try {
-      const res = await fetch('/api/summarise-vacancy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vacancyText: localText.trim() }),
-      })
-      const data = await res.json() as VacancySummary & { error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Summarise failed')
-      setSummary(data)
-    } catch (e) {
-      setSummariseError((e as Error).message)
-    } finally {
-      setSummarising(false)
-    }
+    await runSummarise(localText.trim())
   }
 
   async function handleGenerate() {
