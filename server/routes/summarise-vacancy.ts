@@ -9,13 +9,23 @@ const Schema = z.object({
 })
 
 router.post('/', async (req: Request, res: Response) => {
+  console.log('[summarise] request received, body length:', JSON.stringify(req.body ?? {}).length)
   const parsed = Schema.safeParse(req.body)
   if (!parsed.success) {
+    console.log('[summarise] validation failed:', parsed.error.issues[0].message)
     res.status(400).json({ error: parsed.error.issues[0].message })
     return
   }
+  console.log('[summarise] vacancyText length:', parsed.data.vacancyText.length)
+
+  // Cap input to prevent timeouts on very long pages
+  const vacancyText = parsed.data.vacancyText.length > 30000
+    ? parsed.data.vacancyText.slice(0, 30000)
+    : parsed.data.vacancyText
 
   try {
+    console.log('[summarise] calling Gemini...')
+    const startTime = Date.now()
     const summary = await runPrompt({
       systemPrompt: `Extract key facts from the vacancy announcement. Return ONLY valid JSON — no markdown fences, no commentary:
 {
@@ -40,10 +50,11 @@ Rules:
 - essentialCriteria: up to 6 must-have requirements (qualifications, experience, skills)
 - advantageousCriteria: up to 4 nice-to-have requirements
 - keyResponsibilities: up to 5 main duties in plain language`,
-      userPrompt: parsed.data.vacancyText,
+      userPrompt: vacancyText,
       maxTokens: 800,
       temperature: 0.1,
     })
+    console.log('[summarise] Gemini responded in', Date.now() - startTime, 'ms, length:', summary.length)
 
     // Robust JSON extraction
     const objStart = summary.indexOf('{')
@@ -57,8 +68,10 @@ Rules:
       const fixed = clean.replace(/(?<=:\s*"(?:[^"\\]|\\.)*)[\n\r\t](?=(?:[^"\\]|\\.)*")/g, ' ')
       data = JSON.parse(fixed)
     }
+    console.log('[summarise] success, returning data')
     res.json(data)
   } catch (err) {
+    console.error('[summarise] error:', (err as Error).message, (err as Error).stack)
     res.status(500).json({ error: (err as Error).message })
   }
 })
