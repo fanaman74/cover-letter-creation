@@ -70,7 +70,10 @@ export default function VacancyStep() {
 
   async function handleFetchUrl() {
     const urlVal = urlRef.current?.value.trim() ?? ''
-    if (!urlVal) return
+    if (!urlVal) {
+      setFetchError('Enter a URL first')
+      return
+    }
     setFetchError(null)
     setFetching(true)
     setFetched(false)
@@ -83,11 +86,10 @@ export default function VacancyStep() {
       })
       const data = await res.json() as { text?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to fetch page')
-      const fetched = data.text ?? ''
-      setLocalText(fetched)
+      const pageText = data.text ?? ''
+      setLocalText(pageText)
       setFetched(true)
-      // Auto-summarise after fetch
-      if (fetched.trim().length >= 50) await runSummarise(fetched)
+      if (pageText.trim().length >= 50) await runSummarise(pageText)
     } catch (e) {
       setFetchError((e as Error).message)
     } finally {
