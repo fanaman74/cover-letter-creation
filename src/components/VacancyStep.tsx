@@ -161,7 +161,7 @@ export default function VacancyStep() {
                 <div className="row gap-2" style={{ alignItems: 'stretch' }}>
                   <input
                     className="ink-field"
-                    type="url"
+                    type="text"
                     value={url}
                     onChange={e => { setUrl(e.target.value); setFetched(false); setSummary(null) }}
                     onKeyDown={e => e.key === 'Enter' && handleFetchUrl()}
