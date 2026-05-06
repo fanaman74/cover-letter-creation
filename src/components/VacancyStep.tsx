@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAppStore } from '../stores/appStore'
 import { streamPostSse } from '../lib/sse'
 import { IconVacancy, Star } from './Illos'
@@ -34,12 +34,14 @@ export default function VacancyStep() {
   const { cvText, vacancyText, setVacancyText, startGeneration, updatePhase, setResult, setError, reset } = useAppStore()
   const [mode, setMode] = useState<'paste' | 'url'>('paste')
   const [localText, setLocalText] = useState(vacancyText)
-  const [url, setUrl] = useState('')
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [fetched, setFetched] = useState(false)
   const [tone, setTone] = useState('EU')
   const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Use a ref for URL so paste always works regardless of React's synthetic events
+  const urlRef = useRef<HTMLInputElement>(null)
 
   // Summarise state
   const [summarising, setSummarising] = useState(false)
@@ -47,7 +49,8 @@ export default function VacancyStep() {
   const [summariseError, setSummariseError] = useState<string | null>(null)
 
   async function handleFetchUrl() {
-    if (!url.trim()) return
+    const urlVal = urlRef.current?.value.trim() ?? ''
+    if (!urlVal) return
     setFetchError(null)
     setFetching(true)
     setFetched(false)
@@ -56,7 +59,7 @@ export default function VacancyStep() {
       const res = await fetch('/api/fetch-vacancy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: urlVal }),
       })
       const data = await res.json() as { text?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to fetch page')
@@ -95,6 +98,11 @@ export default function VacancyStep() {
   }
 
   async function handleGenerate() {
+    if (localText.trim().length < 50) {
+      setValidationError('Paste or fetch a vacancy (at least 50 characters)')
+      return
+    }
+    setValidationError(null)
     setVacancyText(localText.trim())
     startGeneration()
 
@@ -160,16 +168,17 @@ export default function VacancyStep() {
               <div className="col gap-3" style={{ marginBottom: 14 }}>
                 <div className="row gap-2" style={{ alignItems: 'stretch' }}>
                   <input
+                    ref={urlRef}
                     className="ink-field"
                     type="text"
-                    value={url}
-                    onChange={e => { setUrl(e.target.value); setFetched(false); setSummary(null) }}
+                    defaultValue=""
                     onKeyDown={e => e.key === 'Enter' && handleFetchUrl()}
+                    onChange={() => { setFetched(false); setSummary(null) }}
                     placeholder="https://careers.example.com/job/123"
                     style={{ flex: 1 }}
                     disabled={fetching}
                   />
-                  <button className="btn" onClick={handleFetchUrl} disabled={fetching || !url.trim()} style={{ minWidth: 100 }}>
+                  <button className="btn" onClick={handleFetchUrl} disabled={fetching} style={{ minWidth: 100 }}>
                     {fetching ? '⟳ fetching…' : '↗ fetch'}
                   </button>
                 </div>
@@ -187,7 +196,7 @@ export default function VacancyStep() {
             <textarea
               className="ink-field"
               value={localText}
-              onChange={e => { setLocalText(e.target.value); setFetched(false); setSummary(null) }}
+              onChange={e => { setLocalText(e.target.value); setSummary(null) }}
               placeholder={mode === 'url'
                 ? 'Extracted text will appear here — you can edit it before generating…'
                 : 'Include the full job description, tasks, selection criteria, employer details, and reference number…'}
@@ -211,7 +220,7 @@ export default function VacancyStep() {
           </div>
         </div>
 
-        {/* Right — tone + controls + summary */}
+        {/* Right — tone + pipeline */}
         <div className="col gap-5">
           <div className="card" style={{ padding: 22 }}>
             <div className="row between ai-center" style={{ marginBottom: 12 }}>
@@ -231,45 +240,6 @@ export default function VacancyStep() {
               {TONE_OPTS.find(o => o.id === tone)?.desc}
             </p>
           </div>
-
-          {/* Summary card — shown after summarise */}
-          {summary && (
-            <div className="card" style={{ padding: 22, background: 'var(--paper-2)', borderLeft: '3px solid var(--teal)' }}>
-              <div className="row between ai-center" style={{ marginBottom: 12 }}>
-                <span className="display" style={{ fontSize: 20 }}>Vacancy summary</span>
-                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>review before generating</span>
-              </div>
-              <div className="col gap-2" style={{ fontSize: 14 }}>
-                <div><strong>{summary.role}</strong> · {summary.employer}</div>
-                {summary.location && <div style={{ color: 'var(--ink-2)' }}>📍 {summary.location}</div>}
-                <div className="row gap-3" style={{ color: 'var(--ink-2)', flexWrap: 'wrap' }}>
-                  {summary.contractType && summary.contractType !== 'Unknown' && <span>📋 {summary.contractType}</span>}
-                  {summary.reference && <span>🔖 Ref: {summary.reference}</span>}
-                  {summary.deadline && <span>⏰ {summary.deadline}</span>}
-                </div>
-                {summary.essentialCriteria.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>ESSENTIAL</div>
-                    <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-2)' }}>
-                      {summary.essentialCriteria.map((c, i) => <li key={i}>{c}</li>)}
-                    </ul>
-                  </div>
-                )}
-                {summary.advantageousCriteria.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>ADVANTAGEOUS</div>
-                    <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-3)' }}>
-                      {summary.advantageousCriteria.map((c, i) => <li key={i}>{c}</li>)}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {summariseError && (
-            <p className="hand" style={{ fontSize: 16, color: 'var(--rust)', margin: 0 }}>{summariseError}</p>
-          )}
 
           <div className="card" style={{ padding: 22 }}>
             <div className="small-caps" style={{ color: 'var(--ink-3)', marginBottom: 12 }}>Pipeline</div>
@@ -294,37 +264,87 @@ export default function VacancyStep() {
           <div className="row between ai-center">
             <button className="btn btn-ghost" onClick={reset}>← back to CV</button>
             <div className="row gap-2">
-              {!summary ? (
-                <button
-                  className="btn btn-ghost"
-                  onClick={handleSummarise}
-                  disabled={summarising}
-                  style={{ borderColor: 'var(--teal)', color: 'var(--teal)' }}
-                >
-                  {summarising ? '⟳ summarising…' : '↗ summarise vacancy'}
-                </button>
-              ) : (
-                <button
-                  className="btn btn-ghost"
-                  onClick={handleSummarise}
-                  disabled={summarising}
-                  style={{ fontSize: 13, padding: '8px 14px' }}
-                >
-                  {summarising ? '⟳' : '↺ re-summarise'}
-                </button>
-              )}
               <button
-                className="btn"
-                onClick={handleGenerate}
-                disabled={!summary}
-                style={{ opacity: summary ? 1 : 0.45 }}
+                className="btn btn-ghost"
+                onClick={handleSummarise}
+                disabled={summarising}
+                style={{ borderColor: 'var(--teal)', color: 'var(--teal)' }}
               >
+                {summarising ? '⟳ summarising…' : summary ? '↺ re-summarise' : '↗ summarise vacancy'}
+              </button>
+              <button className="btn" onClick={handleGenerate}>
                 generate cover letter →
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Summary card — full width, below both columns */}
+      {(summarising || summariseError || summary) && (
+        <div style={{ marginTop: 28 }}>
+          <div className="card" style={{ padding: 28 }}>
+            <div className="row between ai-center" style={{ marginBottom: 18 }}>
+              <div className="row gap-3 ai-center">
+                <span className="ribbon ribbon-teal">Vacancy summary</span>
+                {summarising && <span className="hand" style={{ fontSize: 16, color: 'var(--ink-3)' }}>⟳ analysing…</span>}
+              </div>
+              {summary && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>review before generating</span>}
+            </div>
+
+            {summariseError && (
+              <p className="hand" style={{ fontSize: 16, color: 'var(--rust)', margin: 0 }}>{summariseError}</p>
+            )}
+
+            {summary && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                {/* Left: overview */}
+                <div className="col gap-3">
+                  <div>
+                    <div className="small-caps" style={{ color: 'var(--ink-3)', marginBottom: 4 }}>Role</div>
+                    <div style={{ fontWeight: 700, fontSize: 20 }}>{summary.role}</div>
+                    <div style={{ fontSize: 16, color: 'var(--ink-2)' }}>{summary.employer}</div>
+                  </div>
+                  <div className="row gap-4" style={{ flexWrap: 'wrap', fontSize: 14, color: 'var(--ink-2)' }}>
+                    {summary.location && <span>📍 {summary.location}</span>}
+                    {summary.contractType && summary.contractType !== 'Unknown' && <span>📋 {summary.contractType}</span>}
+                    {summary.reference && <span>🔖 {summary.reference}</span>}
+                    {summary.deadline && <span>⏰ {summary.deadline}</span>}
+                  </div>
+                  {summary.keyResponsibilities.length > 0 && (
+                    <div>
+                      <div className="small-caps" style={{ color: 'var(--ink-3)', marginBottom: 6 }}>Key responsibilities</div>
+                      <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-2)', fontSize: 14, lineHeight: 1.6 }}>
+                        {summary.keyResponsibilities.map((r, i) => <li key={i}>{r}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: criteria */}
+                <div className="col gap-4">
+                  {summary.essentialCriteria.length > 0 && (
+                    <div>
+                      <div className="small-caps" style={{ color: 'var(--ink-3)', marginBottom: 6 }}>Essential criteria</div>
+                      <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-2)', fontSize: 14, lineHeight: 1.6 }}>
+                        {summary.essentialCriteria.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {summary.advantageousCriteria.length > 0 && (
+                    <div>
+                      <div className="small-caps" style={{ color: 'var(--ink-3)', marginBottom: 6 }}>Advantageous</div>
+                      <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-3)', fontSize: 14, lineHeight: 1.6 }}>
+                        {summary.advantageousCriteria.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
