@@ -49,7 +49,14 @@ Rules:
     const objStart = summary.indexOf('{')
     const end = summary.lastIndexOf('}')
     const clean = objStart !== -1 && end > objStart ? summary.slice(objStart, end + 1) : summary
-    const data = JSON.parse(clean)
+    let data
+    try {
+      data = JSON.parse(clean)
+    } catch {
+      // Try fixing unescaped newlines/tabs inside strings
+      const fixed = clean.replace(/(?<=:\s*"(?:[^"\\]|\\.)*)[\n\r\t](?=(?:[^"\\]|\\.)*")/g, ' ')
+      data = JSON.parse(fixed)
+    }
     res.json(data)
   } catch (err) {
     res.status(500).json({ error: (err as Error).message })
